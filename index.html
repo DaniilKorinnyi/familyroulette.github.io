@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
+  <title>Family Roulette</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: url('шаблон.png') no-repeat center center fixed;
+      background-size: cover;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100vh;
+      color: white;
+      backdrop-filter: brightness(0.6);
+    }
+
+    .wheel-container {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 2rem auto 1rem;
+      width: 90vw;
+      max-width: 400px;
+      height: 400px;
+    }
+
+    #wheelCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .arrow {
+      position: absolute;
+      top: -25px;
+      font-size: 2.5rem;
+      color: white;
+      z-index: 10;
+      text-shadow: 2px 2px 4px black;
+      user-select: none;
+    }
+
+    .controls {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .segments {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .segment {
+      background: #fff2;
+      padding: 0.3rem 0.6rem;
+      border-radius: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .segment span {
+      flex: 1;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      background: crimson;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wheel-container">
+    <div class="arrow">▼</div>
+    <canvas id="wheelCanvas" width="400" height="400"></canvas>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="segmentInput" placeholder="Новий сектор" />
+    <button onclick="addSegment()">Додати сектор</button>
+    <div class="segments" id="segmentsList"></div>
+    <button onclick="spinWheel()">Обертати</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const input = document.getElementById('segmentInput');
+    const list = document.getElementById('segmentsList');
+
+    let segments = JSON.parse(localStorage.getItem('segments') || '["Пити", "Танцювати", "Правда", "Виклик"]');
+    let angle = 0;
+    let spinning = false;
+
+    function saveSegments() {
+      localStorage.setItem('segments', JSON.stringify(segments));
+    }
+
+    function drawWheel() {
+      const total = segments.length;
+      const radius = canvas.width / 2;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      segments.forEach((seg, i) => {
+        const startAngle = angle + (i / total) * 2 * Math.PI;
+        const endAngle = angle + ((i + 1) / total) * 2 * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(radius, radius);
+        ctx.arc(radius, radius, radius, startAngle, endAngle);
+        ctx.fillStyle = `hsl(${i * (360 / total)}, 80%, 60%)`;
+        ctx.fill();
+
+        // Text
+        ctx.save();
+        ctx.translate(radius, radius);
+        ctx.rotate(startAngle + (endAngle - startAngle) / 2);
+        ctx.fillStyle = "white";
+        ctx.textAlign = "right";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText(seg, radius - 10, 5);
+        ctx.restore();
+      });
+    }
+
+    function spinWheel() {
+      if (spinning || segments.length < 2) return;
+      spinning = true;
+
+      const spins = Math.floor(Math.random() * 3) + 5; // 5–7 обертів
+      const finalAngle = Math.random() * 2 * Math.PI;
+      const targetAngle = spins * 2 * Math.PI + finalAngle;
+      const duration = 4000;
+      const start = Date.now();
+      const initialAngle = angle;
+
+      function animate() {
+        const elapsed = Date.now() - start;
+        const t = Math.min(elapsed / duration, 1);
+        const easeOut = 1 - Math.pow(1 - t, 3);
+
+        angle = initialAngle + easeOut * (targetAngle - initialAngle);
+        drawWheel();
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          spinning = false;
+
+          const normalizedAngle = (angle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+          const winningIndex = Math.floor((segments.length - (normalizedAngle / (2 * Math.PI)) * segments.length)) % segments.length;
+          alert(`Випало: ${segments[winningIndex]}`);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function updateSegmentList() {
+      list.innerHTML = '';
+      segments.forEach((seg, i) => {
+        const el = document.createElement('div');
+        el.className = 'segment';
+        el.innerHTML = `<span>${seg}</span><button onclick="removeSegment(${i})">×</button>`;
+        list.appendChild(el);
+      });
+    }
+
+    function addSegment() {
+      if (!input.value.trim()) return;
+      segments.push(input.value.trim());
+      input.value = '';
+      saveSegments();
+      updateSegmentList();
+      drawWheel();
+    }
+
+    function removeSegment(index) {
+      segments.splice(index, 1);
+      saveSegments();
+      updateSegmentList();
+      drawWheel();
+    }
+
+    updateSegmentList();
+    drawWheel();
+  </script>
+</body>
+</html>
